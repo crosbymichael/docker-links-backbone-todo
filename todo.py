@@ -13,27 +13,32 @@ from flask import Flask, g, jsonify, render_template, request, abort
 
 import rethinkdb as r
 from rethinkdb.errors import RqlRuntimeError, RqlDriverError
+import docker
 
 #### Connection details
 
 # We will use these settings later in the code to connect to the
 # RethinkDB server.
-RDB_HOST =  os.environ.get('RDB_HOST') or 'localhost'
-RDB_PORT = os.environ.get('RDB_PORT') or 28015
-TODO_DB = 'todoapp'
+
+# Link into this container with a rethinkdb container with the alias db
+proto, ip, port = docker.require_port('db', 28015)
+port = int(port)
+
+# Get the database name via an environment var of the child
+database_name = docker.require_env('db', 'name')
 
 #### Setting up the app database
 
 # The app will use a table `todos` in the database specified by the
-# `TODO_DB` variable.  We'll create the database and table here using
+# `database_name` variable.  We'll create the database and table here using
 # [`db_create`](http://www.rethinkdb.com/api/#py:manipulating_databases-db_create)
 # and
 # [`table_create`](http://www.rethinkdb.com/api/#py:manipulating_tables-table_create) commands.
 def dbSetup():
-    connection = r.connect(host=RDB_HOST, port=RDB_PORT)
+    connection = r.connect(host=ip, port=port)
     try:
-        r.db_create(TODO_DB).run(connection)
-        r.db(TODO_DB).table_create('todos').run(connection)
+        r.db_create(database_name).run(connection)
+        r.db(database_name).table_create('todos').run(connection)
         print 'Database setup completed. Now run the app without --setup.'
     except RqlRuntimeError:
         print 'App database already exists. Run the app without --setup.'
@@ -53,7 +58,7 @@ app.config.from_object(__name__)
 @app.before_request
 def before_request():
     try:
-        g.rdb_conn = r.connect(host=RDB_HOST, port=RDB_PORT, db=TODO_DB)
+        g.rdb_conn = r.connect(host=ip, port=port, db=database_name)
     except RqlDriverError:
         abort(503, "No database connection could be established.")
 
@@ -151,7 +156,7 @@ if __name__ == "__main__":
     if args.run_setup:
         dbSetup()
     else:
-        app.run(debug=True)
+        app.run(debug=True, host='0.0.0.0')
 
 
 # ### Best practices ###
