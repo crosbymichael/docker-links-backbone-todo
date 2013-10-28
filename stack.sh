@@ -8,4 +8,4 @@ docker run -rm -link /rethinkdb:db crosbymichael/linkwebapp --setup
 WEBAPP=$(docker run -d -p 5000 -link /rethinkdb:db crosbymichael/linkwebapp)
 docker link $WEBAPP /todo
 
-docker ps -notrunc
+docker ps
